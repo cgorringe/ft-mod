@@ -1,0 +1,11 @@
+.DS_Store
+*~
+.*~
+*.pyc
+xcuserdata
+xuserdata
+profile
+build/
+
+udp-flaschen-taschen.o
+
