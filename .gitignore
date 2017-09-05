@@ -8,6 +8,7 @@ profile
 build/
 mods/
 ft/
+output/
 
 udp-flaschen-taschen.o
 ft-mod

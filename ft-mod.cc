@@ -52,6 +52,8 @@
 //#include <stdio.h>
 //#include <stdlib.h>
 //#include <string.h>
+#include <errno.h>
+//#include <unistd.h>
 #include <libopenmpt/libopenmpt.h>
 #include <libopenmpt/libopenmpt_stream_callbacks_file.h>
 // must have PortAudio installed
@@ -62,6 +64,7 @@
 static int16_t audio_left[BUFFERSIZE];
 static int16_t audio_right[BUFFERSIZE];
 static int16_t * const audio_buffers[2] = { audio_left, audio_right };
+static int16_t audio_buffer[BUFFERSIZE * 2];
 // ------
 
 // Defaults                      large  small
@@ -70,6 +73,9 @@ static int16_t * const audio_buffers[2] = { audio_left, audio_right };
 #define Z_LAYER 7      // (0-15) 0=background
 #define DELAY 25
 #define MAX_PATH_LENGTH 250
+
+const int kOutSTDOUT = 0;
+const int kOutPA  = 1;
 
 volatile bool interrupt_received = false;
 static void InterruptHandler(int signo) {
@@ -88,6 +94,8 @@ int opt_height = DISPLAY_HEIGHT;
 int opt_xoff=0, opt_yoff=0;
 int opt_delay   = DELAY;
 char opt_filepath[MAX_PATH_LENGTH];
+const char *opt_output_text = "";
+int opt_output = kOutSTDOUT;
 
 int usage(const char *progname) {
 
@@ -99,6 +107,7 @@ int usage(const char *progname) {
         "\t-t <timeout>   : Timeout exits after given seconds. (default 24hrs)\n"
         "\t-h <host>      : Flaschen-Taschen display hostname. (FT_DISPLAY)\n"
         "\t-d <delay>     : Delay between frames in milliseconds. (default 25)\n"
+        "\t-o <output>    : Output audio: 'pa' = PortAudio. (default stdout)\n"
     );
     return 1;
 }
@@ -139,12 +148,23 @@ int cmdLine(int argc, char *argv[]) {
                 return usage(argv[0]);
             }
             break;
+        case 'o':  // output
+            opt_output_text = strdup(optarg);
+            break;
         default:
             return usage(argv[0]);
         }
     }
 
-    // assign default 
+    // set opt_output
+    if (strcmp(opt_output_text, "pa") == 0) {
+        opt_output = kOutPA;
+    }
+    else {
+        opt_output = kOutSTDOUT;
+    }
+
+    // assign default filepath
     strncpy(opt_filepath, "", MAX_PATH_LENGTH);
 
     // retrieve arg text from remaining arguments
@@ -163,6 +183,25 @@ int cmdLine(int argc, char *argv[]) {
     }
 
     return 0;
+}
+
+// ------------------------------------------------------------------------------------------
+// from libopenmpt example
+
+static ssize_t xwrite( int fd, const void * buffer, size_t size ) {
+  size_t written = 0;
+  ssize_t retval = 0;
+  while ( written < size ) {
+    retval = write( fd, (const char *)buffer + written, size - written );
+    if ( retval < 0 ) {
+      if ( errno != EINTR ) {
+        break;
+      }
+      retval = 0;
+    }
+    written += retval;
+  }
+  return written;
 }
 
 // ------------------------------------------------------------------------------------------
@@ -202,6 +241,7 @@ int main(int argc, char *argv[]) {
     FILE *modfile = NULL;
     openmpt_module *mod = NULL;
     size_t mod_count = 0;
+    size_t mod_written = 0;
     PaError pa_error = paNoError;
     PaStream *audio_stream = NULL;
 
@@ -215,30 +255,30 @@ int main(int argc, char *argv[]) {
         }
 
         mod = openmpt_module_create(openmpt_stream_get_file_callbacks(), modfile, NULL, NULL, NULL);
+        fclose(modfile);
         if (!mod) {
             fprintf(stderr, "Error: Not a MOD file?\n");
-            if (modfile) { fclose(modfile); }
             return 1;
         }
 
-        if (modfile) { fclose(modfile); }
-        pa_error = Pa_Initialize();
-        if (pa_error != paNoError) {
-            fprintf(stderr, "Error: PortAudio init failed.\n");
-            return 1;
-        }
-
-        pa_error = Pa_OpenDefaultStream(&audio_stream, 0, 2, paInt16 | paNonInterleaved, SAMPLERATE, 
-            paFramesPerBufferUnspecified, NULL, NULL);
-        if ( !((pa_error == paNoError) && audio_stream) ) {
-            fprintf(stderr, "Error: PortAudio opening stream failed.\n");
-            return 1;
-        }
-
-        pa_error = Pa_StartStream(audio_stream);
-        if (pa_error != paNoError) {
-            fprintf(stderr, "Error: PortAudio starting stream failed.\n");
-            return 1;
+        // PortAudio
+        if (opt_output == kOutPA) {
+            pa_error = Pa_Initialize();
+            if (pa_error != paNoError) {
+                fprintf(stderr, "Error: PortAudio init failed.\n");
+                return 1;
+            }
+            pa_error = Pa_OpenDefaultStream(&audio_stream, 0, 2, paInt16 | paNonInterleaved, SAMPLERATE, 
+                paFramesPerBufferUnspecified, NULL, NULL);
+            if ( !((pa_error == paNoError) && audio_stream) ) {
+                fprintf(stderr, "Error: PortAudio opening stream failed.\n");
+                return 1;
+            }
+            pa_error = Pa_StartStream(audio_stream);
+            if (pa_error != paNoError) {
+                fprintf(stderr, "Error: PortAudio starting stream failed.\n");
+                return 1;
+            }
         }
     }
     else {
@@ -266,15 +306,26 @@ int main(int argc, char *argv[]) {
     //*/
 
         // play mod
-        mod_count = openmpt_module_read_stereo(mod, SAMPLERATE, BUFFERSIZE, audio_left, audio_right);
-        if (mod_count == 0) { break; }
-        pa_error = Pa_WriteStream(audio_stream, audio_buffers, (unsigned long)mod_count);
-        if (pa_error == paOutputUnderflowed) {
-            // not an error
+        if (opt_output == kOutPA) {
+            mod_count = openmpt_module_read_stereo(mod, SAMPLERATE, BUFFERSIZE, audio_left, audio_right);
+            if (mod_count == 0) { break; }
+            pa_error = Pa_WriteStream(audio_stream, audio_buffers, (unsigned long)mod_count);
+            if (pa_error == paOutputUnderflowed) {
+                // not an error
+            }
+            else if (pa_error != paNoError) {
+                fprintf(stderr, "Error: Writing to stream failed.\n");
+                interrupt_received = true;
+            }
         }
-        else if (pa_error != paNoError) {
-            fprintf(stderr, "Error: Writing to stream failed.\n");
-            interrupt_received = true;
+        else if (opt_output == kOutSTDOUT) {
+            mod_count = openmpt_module_read_interleaved_stereo(mod, SAMPLERATE, BUFFERSIZE, audio_buffer);
+            if (mod_count == 0) { break; }
+            mod_written = xwrite( STDOUT_FILENO, audio_buffer, mod_count * 2 * sizeof(int16_t) );
+            if (mod_written == 0) {
+                fprintf(stderr, "Error: Writing audio to STDOUT failed.\n");
+                interrupt_received = true;
+            }
         }
 
         // print info
@@ -288,14 +339,16 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "\nDone.\n");
 
     // cleanup MOD player
-    if (audio_stream) {
-        if ( Pa_IsStreamActive(audio_stream) == 1 ) {
-            Pa_StopStream(audio_stream);
+    if (opt_output == kOutPA) {
+        if (audio_stream) {
+            if ( Pa_IsStreamActive(audio_stream) == 1 ) {
+                Pa_StopStream(audio_stream);
+            }
+            Pa_CloseStream(audio_stream);
+            audio_stream = NULL;
         }
-        Pa_CloseStream(audio_stream);
-        audio_stream = NULL;
+        Pa_Terminate();
     }
-    Pa_Terminate();
     if (mod) {
         openmpt_module_destroy(mod);
         mod = NULL;

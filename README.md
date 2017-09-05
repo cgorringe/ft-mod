@@ -16,3 +16,37 @@ This project uses the C++ framework provided by the [flaschen-taschen](https://g
   git clone --recursive https://github.com/cgorringe/ft-mod
 ```
 
+### Install Dependencies
+#### MacOS X
+(not tested)
+
+```
+brew install portaudio
+brew install zlib
+```
+
+Install **libopenmpt**:
+
+* Download the "Makefile / Android ndk-build" tar.gz file from this [Download]( https://lib.openmpt.org/libopenmpt/download/ ) page.
+
+Untar, then from it's directory:
+
+```
+make clean
+make SHARED_SONAME=0
+make check
+sudo make install SHARED_SONAME=0
+```
+
+#### Ubuntu
+
+(not tested)
+
+```
+apt-get install zlib portaudio libopenmpt-dev
+```
+May need to substitute above with `portaudio-v19` ?
+ 
+Other possible dependencies:
+`gcc, pkg-config, libmpg123, doxygen, libpulse, libpulse-simple, libFLAC, libsndfile, libSDL`
+
