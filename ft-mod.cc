@@ -116,7 +116,7 @@ int cmdLine(int argc, char *argv[]) {
 
     // command line options
     int opt;
-    while ((opt = getopt(argc, argv, "?g:l:t:h:d:")) != -1) {
+    while ((opt = getopt(argc, argv, "?g:l:t:h:d:o:")) != -1) {
         switch (opt) {
         case '?':  // help
             return usage(argv[0]);
@@ -156,14 +156,6 @@ int cmdLine(int argc, char *argv[]) {
         }
     }
 
-    // set opt_output
-    if (strcmp(opt_output_text, "pa") == 0) {
-        opt_output = kOutPA;
-    }
-    else {
-        opt_output = kOutSTDOUT;
-    }
-
     // assign default filepath
     strncpy(opt_filepath, "", MAX_PATH_LENGTH);
 
@@ -180,6 +172,20 @@ int cmdLine(int argc, char *argv[]) {
         if (text && (strlen(text) > 0)) {
             strncpy(opt_filepath, text, MAX_PATH_LENGTH);
         }
+    }
+    if (strlen(opt_filepath) == 0) {
+        fprintf(stderr, "Missing MOD file.\n");
+        return usage(argv[0]);
+    }
+
+    // set opt_output
+    if (strcmp(opt_output_text, "pa") == 0) {
+        opt_output = kOutPA;
+        fprintf(stderr, "Output: PortAudio\n");
+    }
+    else {
+        opt_output = kOutSTDOUT;
+        fprintf(stderr, "Output: stdout\n");
     }
 
     return 0;
@@ -245,45 +251,39 @@ int main(int argc, char *argv[]) {
     PaError pa_error = paNoError;
     PaStream *audio_stream = NULL;
 
-    if (strlen(opt_filepath) > 0) {
-        fprintf(stderr, "Playing: %s\n", opt_filepath);
-        
-        modfile = fopen(opt_filepath, "rb");
-        if (!modfile) {
-            fprintf(stderr, "Error: Couldn't open file or wrong path.\n");
-            return 1;
-        }
+    fprintf(stderr, "Playing: %s\n", opt_filepath);
 
-        mod = openmpt_module_create(openmpt_stream_get_file_callbacks(), modfile, NULL, NULL, NULL);
-        fclose(modfile);
-        if (!mod) {
-            fprintf(stderr, "Error: Not a MOD file?\n");
-            return 1;
-        }
-
-        // PortAudio
-        if (opt_output == kOutPA) {
-            pa_error = Pa_Initialize();
-            if (pa_error != paNoError) {
-                fprintf(stderr, "Error: PortAudio init failed.\n");
-                return 1;
-            }
-            pa_error = Pa_OpenDefaultStream(&audio_stream, 0, 2, paInt16 | paNonInterleaved, SAMPLERATE, 
-                paFramesPerBufferUnspecified, NULL, NULL);
-            if ( !((pa_error == paNoError) && audio_stream) ) {
-                fprintf(stderr, "Error: PortAudio opening stream failed.\n");
-                return 1;
-            }
-            pa_error = Pa_StartStream(audio_stream);
-            if (pa_error != paNoError) {
-                fprintf(stderr, "Error: PortAudio starting stream failed.\n");
-                return 1;
-            }
-        }
+    modfile = fopen(opt_filepath, "rb");
+    if (!modfile) {
+        fprintf(stderr, "Error: Couldn't open file or wrong path.\n");
+        return 1;
     }
-    else {
-        fprintf(stderr, "Missing MOD file.\n");
-        return usage(argv[0]);
+
+    mod = openmpt_module_create(openmpt_stream_get_file_callbacks(), modfile, NULL, NULL, NULL);
+    fclose(modfile);
+    if (!mod) {
+        fprintf(stderr, "Error: Not a MOD file?\n");
+        return 1;
+    }
+
+    // PortAudio
+    if (opt_output == kOutPA) {
+        pa_error = Pa_Initialize();
+        if (pa_error != paNoError) {
+            fprintf(stderr, "Error: PortAudio init failed.\n");
+            return 1;
+        }
+        pa_error = Pa_OpenDefaultStream(&audio_stream, 0, 2, paInt16 | paNonInterleaved, SAMPLERATE, 
+            paFramesPerBufferUnspecified, NULL, NULL);
+        if ( !((pa_error == paNoError) && audio_stream) ) {
+            fprintf(stderr, "Error: PortAudio opening stream failed.\n");
+            return 1;
+        }
+        pa_error = Pa_StartStream(audio_stream);
+        if (pa_error != paNoError) {
+            fprintf(stderr, "Error: PortAudio starting stream failed.\n");
+            return 1;
+        }
     }
 
     do {
