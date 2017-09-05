@@ -18,7 +18,6 @@ This project uses the C++ framework provided by the [flaschen-taschen](https://g
 
 ### Install Dependencies
 #### MacOS X
-(not tested)
 
 ```
 brew install portaudio
@@ -27,7 +26,7 @@ brew install zlib
 
 Install **libopenmpt**:
 
-* Download the "Makefile / Android ndk-build" tar.gz file from this [Download]( https://lib.openmpt.org/libopenmpt/download/ ) page.
+* Download the Source code "Makefile / Android ndk-build" tar.gz file from this [Download]( https://lib.openmpt.org/libopenmpt/download/ ) page.
 
 Untar, then from it's directory:
 
@@ -46,7 +45,16 @@ sudo make install SHARED_SONAME=0
 apt-get install zlib portaudio libopenmpt-dev
 ```
 May need to substitute above with `portaudio-v19` ?
- 
+
 Other possible dependencies:
 `gcc, pkg-config, libmpg123, doxygen, libpulse, libpulse-simple, libFLAC, libsndfile, libSDL`
+
+
+### Running ft-mod
+
+* You'll want some music modules to play.  One website that offers free MOD files is the [MOD Archive](http://modarchive.org).
+* Build the binary by typing `make` from the `ft-mod` directory.
+* To see command line options, type `./ft-mod -?`
+
+### The program isn't finished yet...
 

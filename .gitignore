@@ -9,6 +9,7 @@ build/
 mods/
 ft/
 output/
+libs/
 
 udp-flaschen-taschen.o
 ft-mod
