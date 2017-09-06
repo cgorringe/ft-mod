@@ -24,9 +24,9 @@ brew install zlib
 
 Install **libopenmpt**:
 
-* Download the Source code "Makefile / Android ndk-build" tar.gz file from this [Download]( https://lib.openmpt.org/libopenmpt/download/ ) page.
+* Download the Source code "Makefile / Android ndk-build" tar.gz file from this [Download page]( https://lib.openmpt.org/libopenmpt/download/ ).
 
-Untar, then from it's directory:
+Extract the archive, then from its directory:
 
 ```
 make clean
@@ -62,26 +62,26 @@ Other possible dependencies:
 I couldn't get `ft-mod` to play audio on my Mac, so I decided to try an alternative approach and modified the source code to the **openmpt123** player instead.
 
 
-Steps to Install:
+##### Steps to Install:
 
-1. First follow the directions above to install **libopenmpt** and place it into the `ft-mod/libs/` directory.  It should look like `ft-mod/libs/libopenmpt-...` but you can rename its directory however you like under `libs` (which is in .gitignore so ignored by git.)  I will refer to this directory as <libopenmpt>.
+1. First follow the MacOS X directions above to install **libopenmpt** and place the source code into the `ft-mod/libs/` directory (which you may need to create).  It should look like `ft-mod/libs/libopenmpt-...` but you can rename its directory however you like under `libs` (which is in .gitignore so ignored by git.)  I will refer to this directory as $libopenmpt$.
 
-2. Go into the <libopenmpt> directory, and `rm Makefile`, then create a link to its alternate: `ln -s ../../ft-openmpt/Makefile .`
+2. Go into the $libopenmpt$ directory, and `rm Makefile`, then create a link to its alternate: `ln -s ../../ft-openmpt/Makefile .`
 
-3. Under <libopenmpt>'s `openmpt123` directory: `rm openmpt123.cpp`, then create this link: `ln -s ../../../ft-openmpt/openmpt123/openmpt123.cpp .`
+3. Under $libopenmpt$'s `openmpt123` directory: `rm openmpt123.cpp`, then create this link: `ln -s ../../../ft-openmpt/openmpt123/openmpt123.cpp .`
 
-4. Create one more link in <libopenmpt>: `ln -s ../../ft .`
+4. Create one more link in $libopenmpt$: `ln -s ../../ft .`
 
-5. You may now build the player by running `make` from <libopenmpt>.
+5. You may now build the player by running `make` from $libopenmpt$.
 
 
-To play a MOD file on the Flaschen-Taschen or local server:
+##### To play a MOD file on the Flaschen-Taschen or local server:
 
 ```
 export FT_DISPLAY=ft.noise or localhost
-./bin/openmpt123/openmpt123 <MOD-FILES...>
+./bin/openmpt123/openmpt123 [MOD_FILES]...
 ```
 
-While playing, press `q` to quit. `m` to play next song in playlist. You can use wildcards or list multiple files to create a playlist. Spacebar pauses song.
+While playing, press `q` to quit. `m` to play next song in playlist. You can use wildcards or list multiple files to create a playlist. `Spacebar` pauses song.
 
 
