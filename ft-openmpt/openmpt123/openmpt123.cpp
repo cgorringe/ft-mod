@@ -963,8 +963,7 @@ static void colorGradient(int start, int end, int r1, int g1, int b1, int r2, in
 
 	std::uint8_t  get_pattern_row_channel_command (std::int32_t pattern, std::int32_t row, std::int32_t channel, int command)
 		command is of type: enum openmpt::module::command_index
-			command_note
-			command_instrument
+			command_note, command_instrument, command_volumeffect, command_effect, command_volume, command_parameter
 
 	I'm not sure what note number is...
 		- Could be 0-127, where 60 is Middle-C ?? (this is the midi spec, but I'm still looking for the mod spec)
@@ -983,10 +982,11 @@ static void ft_draw_notes( std::ostream & log, Tmod & mod, UDPFlaschenTaschen & 
 	std::int32_t pattern = mod.get_current_pattern();
 	std::int32_t row = mod.get_current_row();
 	std::uint8_t note, inst;
-	int note_num;
+	int note_num, effect;
 	int px, py;
-    Color transparent = Color(0, 0, 0);
-    //Color black = Color(1, 1, 1);
+	float vol;
+    //Color bg = Color(0, 0, 0);
+    Color bg = Color(1, 1, 1);
 
 	// widen note pixels
 	int p_width, p_offset = 0;
@@ -1004,29 +1004,69 @@ static void ft_draw_notes( std::ostream & log, Tmod & mod, UDPFlaschenTaschen & 
 
 	log << "     Notes : ";
 	for (int c=0; c < num_channels; c++) {
+		px = c % FT_DISPLAY_WIDTH;  // prevents overflow
 		note = mod.get_pattern_row_channel_command( pattern, row, c, openmpt::module::command_index::command_note );
 		inst = mod.get_pattern_row_channel_command( pattern, row, c, openmpt::module::command_index::command_instrument );
+		effect = (int)mod.get_pattern_row_channel_command( pattern, row, c, openmpt::module::command_index::command_effect );
+		// wild guess that effect == 0xEC means Note Cut, similar to when note == 0xFF
 		note_num = (int)note;
 		log << std::setw(4) << std::setfill('.') << note_num;
 
-		// draw pixel
-		if (note_num > 0) {
-			px = c % FT_DISPLAY_WIDTH;  // prevents overflow
+		// check channel volume
+		vol = mod.get_current_channel_vu_mono(c);
+		if (vol == 0) {
+			// clear column when volume silent
+			for (int y=0; y < FT_DISPLAY_HEIGHT - 1; ++y) {  // not in last row
+				for (int i=0; i < p_width; ++i) {
+					canvas.SetPixel( px * p_width + i + p_offset, y, bg );
+				}
+			}
+			// DEBUG: draw gray pixel for clear
+			//for (int i=0; i < p_width; i++) {
+			//	canvas.SetPixel( px * p_width + i + p_offset, 0, Color(0x80, 0x80, 0x80) );
+			//}
+		}
+		else if (note_num > 0) {
+		//if ((note_num > 0) || (effect == 0xEC)) {  // TEST 0xEC
+			// draw pixel
 
 			// clear column
-			for (int y=0; y < FT_DISPLAY_HEIGHT - 1; y++) {  // not in last row
-				for (int i=0; i < p_width; i++) {
-					canvas.SetPixel( px * p_width + i + p_offset, y, transparent );
+			for (int y=0; y < FT_DISPLAY_HEIGHT - 1; ++y) {  // not in last row
+				for (int i=0; i < p_width; ++i) {
+					canvas.SetPixel( px * p_width + i + p_offset, y, bg );
 				}
 			}
 
+			// TEST 0xEC
+			// nothing's showing in first row, so effect is never 0xEC ??
+			/*
+			if (effect == 0xEC) {
+				for (int i=0; i < p_width; i++) {
+					canvas.SetPixel( px * p_width + i + p_offset, 0, Color(0x80, 0x80, 0x80) );
+				}
+			}
+			//*/
+			/*  Other effects to test:
+			 *  'K00' = Key off
+			 *  'G00' = Set global volume to 0?
+			 *  'H00' = Global volume slide
+			 *  'C00' = Set volume to 0?
+			 *  'D' = Pattern break (what does that mean?)
+			 *  check using 'command_volumeffect' for return value of 0 volume?
+			 *
+			 * Or check the channel's volume! (works great!)
+			 *  float openmpt::module::get_current_channel_vu_mono(std::int32_t channel)
+			 *
+			 */
+
 			// draw note
 			if (note_num < 255) {
+			//if ((note_num < 255) && (effect != 0xEC)) {  // TEST 0xEC
 				//py = FT_DISPLAY_HEIGHT - (note_num - 65 + (FT_DISPLAY_HEIGHT >> 1));  // original
 				py = FT_DISPLAY_HEIGHT - (((note_num - 65) >> 1) + (FT_DISPLAY_HEIGHT >> 1));  // div note by 2 (better)
 
 				if ((py >= 0) && (py < FT_DISPLAY_HEIGHT - 1)) {  // not in last row
-					for (int i=0; i < p_width; i++) {
+					for (int i=0; i < p_width; ++i) {
 						canvas.SetPixel( px * p_width + i + p_offset, py, palette[inst] );
 						// draw black above and below
 						//canvas.SetPixel( px * p_width + i + p_offset, py - 1, black );
@@ -1107,7 +1147,8 @@ void render_loop( commandlineflags & flags, Tmod & mod, double & duration, texto
 	// Open socket and create our canvas [FT]
 	const int ft_socket = OpenFlaschenTaschenSocket(NULL);  // to set hostname use export FT_DISPLAY
 	UDPFlaschenTaschen ft_canvas(ft_socket, FT_DISPLAY_WIDTH, FT_DISPLAY_HEIGHT);
-	ft_canvas.Clear();
+	Color bg = Color(1, 1, 1); // black bg
+	ft_canvas.Fill(bg);
 
 	// Load font & prepare scrolling title [FT]
 	ft::Font ft_font;
@@ -1123,7 +1164,7 @@ void render_loop( commandlineflags & flags, Tmod & mod, double & duration, texto
 	}
 	std::string ft_title = mod.get_metadata("title");
 	const char *ft_text = ft_title.c_str();
-	int ft_text_width = DrawText(&ft_canvas, ft_font, 0, 0, Color(0, 0, 0), NULL, ft_text, 0);
+	int ft_text_width = DrawText(&ft_canvas, ft_font, 0, 0, bg, NULL, ft_text, 0);
 	int ft_total_width = ft_text_width + FT_DISPLAY_WIDTH;
 	int ft_scroll_pos = FT_DISPLAY_WIDTH;
 
@@ -1134,7 +1175,7 @@ void render_loop( commandlineflags & flags, Tmod & mod, double & duration, texto
 	float step = num_inst / 7.0f;
 	Color palette[256];
 	Color white = Color(255, 255, 255);
-	for (int i=0; i < 256; i++) {
+	for (int i=0; i < 256; ++i) {
 		palette[i] = white;
 	}
 	// rainbow palette (magenta)
@@ -1337,7 +1378,7 @@ void render_loop( commandlineflags & flags, Tmod & mod, double & duration, texto
 #endif
 			log << std::endl;
 
-			// -- Draw Notes -- [FT]
+			// -- Draw on Flashen-Taschen -- [FT]
 			ft_draw_notes( log, mod, ft_canvas, palette );
 			ft_draw_progress( mod, ft_canvas, duration );
 
@@ -1528,10 +1569,12 @@ void render_loop( commandlineflags & flags, Tmod & mod, double & duration, texto
 
 	log.writeout();
 
-	// clear canvas on exit [FT]
-	ft_canvas.Clear();
-	ft_canvas.Send();
-	// TODO: free canvas memory
+	// clears canvas only when the last song [FT]
+	// FIXME: figure out how to clear on exit [q] or SIGINT, which isn't simple
+	if ( flags.playlist_index + 1 == flags.filenames.size() ) {
+		ft_canvas.Clear();
+		ft_canvas.Send();
+	}
 }
 
 template < typename Tmod >
