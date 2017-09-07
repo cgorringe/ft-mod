@@ -45,7 +45,10 @@ static const char * const license =
 ;
 
 #include "openmpt123_config.hpp"
-#include "ft/api/include/udp-flaschen-taschen.h"  // [FT]
+
+// [FT]
+#include "ft/api/include/udp-flaschen-taschen.h"
+#include "ft/api/include/bdf-font.h"
 
 #include <algorithm>
 #include <deque>
@@ -109,6 +112,10 @@ static const char * const license =
 #define FT_DISPLAY_WIDTH  (9*5)
 #define FT_DISPLAY_HEIGHT (7*5)
 #define FT_Z_LAYER 11  // (0-15) 0=background
+
+//#define FT_FONT_FILE "../ft/client/fonts/5x5.bdf"
+#define FT_FONT_FILE "ft/client/fonts/5x5.bdf"
+
 
 namespace openmpt123 {
 
@@ -930,7 +937,7 @@ static void draw_channel_meters( std::ostream & log, float peak_left, float peak
 }
 
 // ----------------------------------------------------------------------------------------------------
-// NEW Code [FT]
+// Flaschen-Taschen functions [FT]
 
 static void colorGradient(int start, int end, int r1, int g1, int b1, int r2, int g2, int b2, Color palette[]) {
     float k;
@@ -1043,6 +1050,16 @@ static void ft_draw_progress( Tmod & mod, UDPFlaschenTaschen & canvas, double & 
 	canvas.SetPixel( px    , FT_DISPLAY_HEIGHT - 1, Color(128, 128, 128) );
 }
 
+static void ft_draw_title( std::string title, int x_pos, ft::Font & text_font, ft::Font & outline_font, UDPFlaschenTaschen & canvas ) {
+
+	const char *text = title.c_str();
+	Color fg = Color(0x99, 0x99, 0x99);
+	Color bg = Color(1, 1, 1);
+
+	DrawText(&canvas, outline_font, x_pos, 4, bg, NULL, text, -2);
+	DrawText(&canvas, text_font, x_pos + 1, 4, fg, &bg, text, 0);
+}
+
 // ----------------------------------------------------------------------------------------------------
 
 template < typename Tsample, typename Tmod >
@@ -1087,10 +1104,28 @@ void render_loop( commandlineflags & flags, Tmod & mod, double & duration, texto
 	int lines = 0;
 	lines += 2;  // [FT]
 
-	// open socket and create our canvas [FT]
-	const int socket = OpenFlaschenTaschenSocket(NULL);  // to set hostname use export FT_DISPLAY
-	UDPFlaschenTaschen canvas(socket, FT_DISPLAY_WIDTH, FT_DISPLAY_HEIGHT);
-	canvas.Clear();
+	// Open socket and create our canvas [FT]
+	const int ft_socket = OpenFlaschenTaschenSocket(NULL);  // to set hostname use export FT_DISPLAY
+	UDPFlaschenTaschen ft_canvas(ft_socket, FT_DISPLAY_WIDTH, FT_DISPLAY_HEIGHT);
+	ft_canvas.Clear();
+
+	// Load font & prepare scrolling title [FT]
+	ft::Font ft_font;
+	ft::Font *ft_outline = NULL;
+	if (!ft_font.LoadFont(FT_FONT_FILE)) {
+	    log << "ERROR: Couldn't load font file!" << std::endl;
+	}
+	if (ft_font.height() < 0) {
+	    log << "ERROR: Font not loaded!" << std::endl;
+	}
+	else {
+			ft_outline = ft_font.CreateOutlineFont();
+	}
+	std::string ft_title = mod.get_metadata("title");
+	const char *ft_text = ft_title.c_str();
+	int ft_text_width = DrawText(&ft_canvas, ft_font, 0, 0, Color(0, 0, 0), NULL, ft_text, 0);
+	int ft_total_width = ft_text_width + FT_DISPLAY_WIDTH;
+	int ft_scroll_pos = FT_DISPLAY_WIDTH;
 
 	// Setup palette [FT]
 	//int num_inst = mod.get_num_instruments();  // usually 0 for MOD, S3M
@@ -1189,8 +1224,12 @@ void render_loop( commandlineflags & flags, Tmod & mod, double & duration, texto
 #endif
 
 	double cpu_smooth = 0.0;
+	int ft_count = 0;  // [FT]
 
 	while ( true ) {
+
+		ft_count++;
+        if (ft_count == INT_MAX) { ft_count=0; }
 
 		if ( flags.mode == ModeUI ) {
 
@@ -1299,11 +1338,17 @@ void render_loop( commandlineflags & flags, Tmod & mod, double & duration, texto
 			log << std::endl;
 
 			// -- Draw Notes -- [FT]
-			ft_draw_notes( log, mod, canvas, palette );
-			ft_draw_progress( mod, canvas, duration );
+			ft_draw_notes( log, mod, ft_canvas, palette );
+			ft_draw_progress( mod, ft_canvas, duration );
 
-			canvas.SetOffset(0, 0, FT_Z_LAYER);
-			canvas.Send();
+			if (ft_count % 100) {  // TODO: find value
+				if (ft_scroll_pos + ft_total_width >= 0) {
+					ft_draw_title( ft_title, ft_scroll_pos, ft_font, *ft_outline, ft_canvas );
+					ft_scroll_pos--;
+				}
+			}
+			ft_canvas.SetOffset(0, 0, FT_Z_LAYER);
+			ft_canvas.Send();
 			// ----------
 
 			if ( flags.show_meters ) {
@@ -1484,8 +1529,8 @@ void render_loop( commandlineflags & flags, Tmod & mod, double & duration, texto
 	log.writeout();
 
 	// clear canvas on exit [FT]
-	canvas.Clear();
-	canvas.Send();
+	ft_canvas.Clear();
+	ft_canvas.Send();
 	// TODO: free canvas memory
 }
 
