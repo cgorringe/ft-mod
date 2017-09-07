@@ -9,6 +9,7 @@
 
  *** Modified Player for the Flaschen-Taschen ***
  by Carl Gorringe (carl.gorringe.org)
+ https://github.com/cgorringe/ft-mod
  9/5/2017
 
  */
@@ -108,7 +109,6 @@ static const char * const license =
 #define FT_DISPLAY_WIDTH  (9*5)
 #define FT_DISPLAY_HEIGHT (7*5)
 #define FT_Z_LAYER 11  // (0-15) 0=background
-//#define FT_DELAY 25
 
 namespace openmpt123 {
 
@@ -968,7 +968,7 @@ static void colorGradient(int start, int end, int r1, int g1, int b1, int r2, in
 */
 
 template < typename Tmod >
-static void draw_notes( std::ostream & log, Tmod & mod, UDPFlaschenTaschen & canvas, Color palette[] ) {
+static void ft_draw_notes( std::ostream & log, Tmod & mod, UDPFlaschenTaschen & canvas, Color palette[] ) {
 
 	//log << "TEST: Channels: " << mod.get_num_channels() << std::endl;
 
@@ -979,7 +979,7 @@ static void draw_notes( std::ostream & log, Tmod & mod, UDPFlaschenTaschen & can
 	int note_num;
 	int px, py;
     Color transparent = Color(0, 0, 0);
-    Color black = Color(1, 1, 1);
+    //Color black = Color(1, 1, 1);
 
 	// widen note pixels
 	int p_width, p_offset = 0;
@@ -993,7 +993,7 @@ static void draw_notes( std::ostream & log, Tmod & mod, UDPFlaschenTaschen & can
 	// vertically center notes
 	p_offset = ((FT_DISPLAY_WIDTH - (num_channels * p_width)) >> 1);
 	p_offset -= (p_offset % p_width);  // aligns on p_width boundry
-	log << "w:" << p_width << " o:" << p_offset << std::endl;  // DEBUG
+	log << "  FT Debug : w:" << p_width << " o:" << p_offset << std::endl;  // DEBUG
 
 	log << "     Notes : ";
 	for (int c=0; c < num_channels; c++) {
@@ -1007,7 +1007,7 @@ static void draw_notes( std::ostream & log, Tmod & mod, UDPFlaschenTaschen & can
 			px = c % FT_DISPLAY_WIDTH;  // prevents overflow
 
 			// clear column
-			for (int y=0; y < FT_DISPLAY_HEIGHT; y++) {
+			for (int y=0; y < FT_DISPLAY_HEIGHT - 1; y++) {  // not in last row
 				for (int i=0; i < p_width; i++) {
 					canvas.SetPixel( px * p_width + i + p_offset, y, transparent );
 				}
@@ -1018,11 +1018,12 @@ static void draw_notes( std::ostream & log, Tmod & mod, UDPFlaschenTaschen & can
 				//py = FT_DISPLAY_HEIGHT - (note_num - 65 + (FT_DISPLAY_HEIGHT >> 1));  // original
 				py = FT_DISPLAY_HEIGHT - (((note_num - 65) >> 1) + (FT_DISPLAY_HEIGHT >> 1));  // div note by 2 (better)
 
-				if ((py >= 0) && (py < FT_DISPLAY_HEIGHT)) {
+				if ((py >= 0) && (py < FT_DISPLAY_HEIGHT - 1)) {  // not in last row
 					for (int i=0; i < p_width; i++) {
 						canvas.SetPixel( px * p_width + i + p_offset, py, palette[inst] );
-						canvas.SetPixel( px * p_width + i + p_offset, py - 1, black );
-						canvas.SetPixel( px * p_width + i + p_offset, py + 1, black );
+						// draw black above and below
+						//canvas.SetPixel( px * p_width + i + p_offset, py - 1, black );
+						//canvas.SetPixel( px * p_width + i + p_offset, py + 1, black );
 					}
 				}
 			}
@@ -1031,6 +1032,15 @@ static void draw_notes( std::ostream & log, Tmod & mod, UDPFlaschenTaschen & can
 	}
 	log << std::endl;
 
+}
+
+template < typename Tmod >
+static void ft_draw_progress( Tmod & mod, UDPFlaschenTaschen & canvas, double & duration ) {
+
+	int px = std::floor( (mod.get_position_seconds() / duration) * FT_DISPLAY_WIDTH );
+
+	canvas.SetPixel( px - 1, FT_DISPLAY_HEIGHT - 1, Color( 32,  32,  32) );
+	canvas.SetPixel( px    , FT_DISPLAY_HEIGHT - 1, Color(128, 128, 128) );
 }
 
 // ----------------------------------------------------------------------------------------------------
@@ -1289,7 +1299,9 @@ void render_loop( commandlineflags & flags, Tmod & mod, double & duration, texto
 			log << std::endl;
 
 			// -- Draw Notes -- [FT]
-			draw_notes( log, mod, canvas, palette );
+			ft_draw_notes( log, mod, canvas, palette );
+			ft_draw_progress( mod, canvas, duration );
+
 			canvas.SetOffset(0, 0, FT_Z_LAYER);
 			canvas.Send();
 			// ----------

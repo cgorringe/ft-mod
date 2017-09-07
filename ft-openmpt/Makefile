@@ -9,6 +9,7 @@
 #
 # *** Modified for the Flaschen-Taschen ***
 # by Carl Gorringe (carl.gorringe.org)
+# https://github.com/cgorringe/ft-mod
 # 9/5/2017
 #
 #
