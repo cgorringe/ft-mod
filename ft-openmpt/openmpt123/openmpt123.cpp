@@ -950,19 +950,10 @@ static void colorGradient(int start, int end, int r1, int g1, int b1, int r2, in
 }
 
 // set palette to a rainbow of colors based on number of samples or instruments
-template < typename Tmod >
-static void setPalette1( Color palette[], Tmod & mod ) {
+static void setupPalette( int instruments, Color palette[] ) {
 
-	// init all to white
-	Color white = Color(255, 255, 255);
-	for (int i=0; i < 256; ++i) {
-		palette[i] = white;
-	}
-
-	//int num_inst = mod.get_num_instruments();  // usually 0 for MOD, S3M
-	int num_inst = mod.get_num_samples();
-	//int num_inst = std::max( mod.get_num_samples(), mod.get_num_instruments() );
-	float step = num_inst / 7.0f;
+	//float step = instruments / 7.0f;
+	float step = instruments / 6.0f;
 
 	// rainbow palette (magenta)
 	/*
@@ -987,42 +978,52 @@ static void setPalette1( Color palette[], Tmod & mod ) {
 	//*/
 
 	// rainbow palette (yellow)
-	colorGradient( step * 0, step * 1 - 1, 255, 255,   0, 255, 127,   0, palette );  // yellow -> orange
-	colorGradient( step * 1, step * 2 - 1, 255, 127,   0, 255,   0,   0, palette );  // orange -> red
-	colorGradient( step * 2, step * 3 - 1, 255,   0,   0, 255,   0, 255, palette );  // red -> magenta
-	colorGradient( step * 3, step * 4 - 1, 255,   0, 255,   0,   0, 255, palette );  // magenta -> blue
-	colorGradient( step * 4, step * 5 - 1,   0,   0, 255,   0, 255, 255, palette );  // blue -> cyan
-	colorGradient( step * 5, step * 6 - 1,   0, 255, 255,   0, 255,   0, palette );  // cyan -> green
-	colorGradient( step * 6, step * 7 - 1,   0, 255,   0, 255, 255,   0, palette );  // green -> yellow
+	/*
+	colorGradient( step * 0, step * 1, 255, 255,   0, 255, 127,   0, palette );  // yellow -> orange
+	colorGradient( step * 1, step * 2, 255, 127,   0, 255,   0,   0, palette );  // orange -> red
+	colorGradient( step * 2, step * 3, 255,   0,   0, 255,   0, 255, palette );  // red -> magenta
+	colorGradient( step * 3, step * 4, 255,   0, 255,   0,   0, 255, palette );  // magenta -> blue
+	colorGradient( step * 4, step * 5,   0,   0, 255,   0, 255, 255, palette );  // blue -> cyan
+	colorGradient( step * 5, step * 6,   0, 255, 255,   0, 255,   0, palette );  // cyan -> green
+	colorGradient( step * 6, step * 7,   0, 255,   0, 255, 255,   0, palette );  // green -> yellow
 	//*/
+
+	// rainbow palette (yellow) less green
+	colorGradient( step * 0, step * 1, 255, 255,   0, 255, 127,   0, palette );  // yellow -> orange
+	colorGradient( step * 1, step * 2, 255, 127,   0, 255,   0,   0, palette );  // orange -> red
+	colorGradient( step * 2, step * 3, 255,   0,   0, 255,   0, 255, palette );  // red -> magenta
+	colorGradient( step * 3, step * 4, 255,   0, 255,   0,   0, 255, palette );  // magenta -> blue
+	colorGradient( step * 4, step * 5,   0,   0, 255,   0, 255, 255, palette );  // blue -> cyan
+	colorGradient( step * 5, step * 6,   0, 255, 255, 255, 255,   0, palette );  // cyan -> yellow
+	//*/
+
+	// set remaining to white
+	Color white = Color(255, 255, 255);
+	for (int i = instruments; i < 256; ++i) {
+		palette[i] = white;
+	}
 }
 
-// random generator
-//int myrandom (int i) { return std::rand() % i; }
-
-// set all 256 colors to a rainbow, then randomize order of colors
-static void setPalette2( Color palette[] ) {
-
-	// Rainbow palette
-	colorGradient(   0,  35, 255,   0, 255,   0,   0, 255, palette );  // magenta -> blue
-	colorGradient(  36,  71,   0,   0, 255,   0, 255, 255, palette );  // blue -> cyan
-	colorGradient(  72, 107,   0, 255, 255,   0, 255,   0, palette );  // cyan -> green
-	colorGradient( 108, 143,   0, 255,   0, 255, 255,   0, palette );  // green -> yellow
-	colorGradient( 144, 179, 255, 255,   0, 255, 127,   0, palette );  // yellow -> orange
-	colorGradient( 180, 215, 255, 127,   0, 255,   0,   0, palette );  // orange -> red
-	colorGradient( 216, 255, 255,   0,   0, 255,   0, 255, palette );  // red -> magenta
+static void randomizePalette( int instruments, Color palette[] ) {
 
 	// randomize colors in palette
 	int p;
 	Color c;
-	for (int i=0; i < 256; ++i) {
-		p = i + (std::rand() % (256 - i));
+	for (int i=0; i < instruments; ++i) {
+		p = i + (std::rand() % (instruments - i));
 		c = palette[p];
 		palette[p] = palette[i];
 		palette[i] = c;
 	}
 }
 
+// draw colored dots
+void testPalette( UDPFlaschenTaschen & canvas, Color palette[] ) {
+
+	for (int x=0; x < FT_DISPLAY_WIDTH; ++x) {
+		canvas.SetPixel( x, FT_DISPLAY_HEIGHT - 1, palette[x] );
+	}
+}
 
 /*
  Useful mod methods:
@@ -1245,8 +1246,12 @@ void render_loop( commandlineflags & flags, Tmod & mod, double & duration, texto
 
 	// Setup palette [FT]
 	Color palette[256];
-	//setPalette1( palette, mod );
-	setPalette2( palette );
+	int num_inst = mod.get_num_samples() + 1;
+	//int num_inst = mod.get_num_instruments();  // usually 0 for MOD, S3M
+	//int num_inst = std::max( mod.get_num_samples(), mod.get_num_instruments() ) + 1;
+	setupPalette( num_inst, palette );
+	randomizePalette( num_inst, palette );
+	//testPalette( ft_canvas, palette );  // [TP]
 
 	int pattern_lines = 0;
 
@@ -1418,7 +1423,7 @@ void render_loop( commandlineflags & flags, Tmod & mod, double & duration, texto
 
 			// -- Draw on Flashen-Taschen -- [FT]
 			ft_draw_notes( log, mod, ft_canvas, palette );
-			ft_draw_progress( mod, ft_canvas, duration );
+			ft_draw_progress( mod, ft_canvas, duration );  // [TP]
 
 			if (ft_count % 100) {  // TODO: find value
 				if (ft_scroll_pos + ft_total_width >= 0) {

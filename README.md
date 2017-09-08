@@ -77,11 +77,18 @@ I couldn't get `ft-mod` to play audio on my Mac, so I decided to try an alternat
 
 ##### To play a MOD file on the Flaschen-Taschen or local server:
 
+From $libopenmpt$:
+
 ```
 export FT_DISPLAY=ft.noise or localhost
-./bin/openmpt123/openmpt123 [MOD_FILES]...
+./bin/openmpt123 [MOD_FILES]...
+```
+
+To shuffle playlist and restart when finished...
+
+```
+./bin/openmpt123 --randomize --restart [MOD_FILES]...
 ```
 
 While playing, press `q` to quit. `m` to play next song in playlist. You can use wildcards or list multiple files to create a playlist. `Spacebar` pauses song.
-
 
