@@ -18,6 +18,7 @@ This project uses the C++ framework provided by the [flaschen-taschen](https://g
 #### MacOS X
 
 ```
+brew install pkg-config
 brew install portaudio
 brew install zlib
 ```
@@ -73,6 +74,8 @@ I couldn't get `ft-mod` to play audio on my Mac, so I decided to try an alternat
 4. Create one more link in $libopenmpt$: `ln -s ../../ft .`
 
 5. You may now build the player by running `make` from $libopenmpt$.
+
+6. (Linux only) Run: `sudo ldconfig`
 
 
 ##### To play a MOD file on the Flaschen-Taschen or local server:
