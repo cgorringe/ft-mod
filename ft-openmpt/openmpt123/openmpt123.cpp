@@ -112,6 +112,7 @@ static const char * const license =
 #define FT_DISPLAY_WIDTH  (9*5)
 #define FT_DISPLAY_HEIGHT (7*5)
 #define FT_Z_LAYER 11  // (0-15) 0=background
+#define FT_PROGRESS_BAR 1    // 0=bottom, 1=top
 
 //#define FT_FONT_FILE "../ft/client/fonts/5x5.bdf"
 #define FT_FONT_FILE "ft/client/fonts/5x5.bdf"
@@ -1092,7 +1093,7 @@ static void ft_draw_notes( std::ostream & log, Tmod & mod, UDPFlaschenTaschen & 
 		vol = mod.get_current_channel_vu_mono(c);
 		if (vol == 0) {
 			// clear column when volume silent
-			for (int y=0; y < FT_DISPLAY_HEIGHT - 1; ++y) {  // not in last row
+			for (int y = FT_PROGRESS_BAR; y < FT_DISPLAY_HEIGHT - (1 - FT_PROGRESS_BAR); ++y) {  // not in last row
 				for (int i=0; i < p_width; ++i) {
 					canvas.SetPixel( px * p_width + i + p_offset, y, bg );
 				}
@@ -1107,7 +1108,7 @@ static void ft_draw_notes( std::ostream & log, Tmod & mod, UDPFlaschenTaschen & 
 			// draw pixel
 
 			// clear column
-			for (int y=0; y < FT_DISPLAY_HEIGHT - 1; ++y) {  // not in last row
+			for (int y = FT_PROGRESS_BAR; y < FT_DISPLAY_HEIGHT - (1 - FT_PROGRESS_BAR); ++y) {  // not in last row
 				for (int i=0; i < p_width; ++i) {
 					canvas.SetPixel( px * p_width + i + p_offset, y, bg );
 				}
@@ -1141,7 +1142,7 @@ static void ft_draw_notes( std::ostream & log, Tmod & mod, UDPFlaschenTaschen & 
 				//py = FT_DISPLAY_HEIGHT - (note_num - 65 + (FT_DISPLAY_HEIGHT >> 1));  // original
 				py = FT_DISPLAY_HEIGHT - (((note_num - 65) >> 1) + (FT_DISPLAY_HEIGHT >> 1));  // div note by 2 (better)
 
-				if ((py >= 0) && (py < FT_DISPLAY_HEIGHT - 1)) {  // not in last row
+				if ((py >= FT_PROGRESS_BAR) && (py < FT_DISPLAY_HEIGHT - (1 - FT_PROGRESS_BAR))) {  // not in progress bar
 					for (int i=0; i < p_width; ++i) {
 						canvas.SetPixel( px * p_width + i + p_offset, py, palette[inst] );
 						// draw black above and below
@@ -1161,9 +1162,9 @@ template < typename Tmod >
 static void ft_draw_progress( Tmod & mod, UDPFlaschenTaschen & canvas, double & duration ) {
 
 	int px = std::floor( (mod.get_position_seconds() / duration) * FT_DISPLAY_WIDTH );
-
-	canvas.SetPixel( px - 1, FT_DISPLAY_HEIGHT - 1, Color( 32,  32,  32) );
-	canvas.SetPixel( px    , FT_DISPLAY_HEIGHT - 1, Color(128, 128, 128) );
+	int row = (FT_PROGRESS_BAR == 0) ? FT_DISPLAY_HEIGHT - 1 : 0;  // bottom or top
+	canvas.SetPixel( px - 1, row, Color(0x20, 0x20, 0x20) );
+	canvas.SetPixel( px    , row, Color(0xFF, 0xFF, 0xFF) );
 }
 
 static void ft_draw_title( std::string title, int x_pos, ft::Font & text_font, ft::Font & outline_font, UDPFlaschenTaschen & canvas ) {
@@ -1171,9 +1172,11 @@ static void ft_draw_title( std::string title, int x_pos, ft::Font & text_font, f
 	const char *text = title.c_str();
 	Color fg = Color(0x99, 0x99, 0x99);
 	Color bg = Color(1, 1, 1);
+	//int base_row = 4;  // 4 = no rows above
+	int base_row = 5;  // 5 = one row above
 
-	DrawText(&canvas, outline_font, x_pos, 4, bg, NULL, text, -2);
-	DrawText(&canvas, text_font, x_pos + 1, 4, fg, &bg, text, 0);
+	DrawText(&canvas, outline_font, x_pos, base_row, bg, NULL, text, -2);
+	DrawText(&canvas, text_font, x_pos + 1, base_row, fg, &bg, text, 0);
 }
 
 // ----------------------------------------------------------------------------------------------------
