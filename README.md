@@ -3,10 +3,14 @@ Music .MOD-file Player for the [Noisebridge Flaschen Taschen Project](https://no
 
 By [Carl Gorringe](http://carl.gorringe.org)
 
-These instructions assume you're running a Mac or Linux OS.  No effort has been made to test it on Windows.
+[![Butterfly Flew Away](img/butterfly.jpg)](https://youtu.be/PKlmApLoxqQ)
+[![5MoF Talk](img/5MoF.jpg)](https://youtu.be/X6H2I7ulB0A)
 
+See more programs that I wrote for the Flaschen Taschen at [ft-demos](https://github.com/cgorringe/ft-demos).
 
 ### How to Install
+
+These instructions assume you're running a Mac or Linux OS.  No effort has been made to test it on Windows.
 
 This project uses the C++ framework provided by the [flaschen-taschen](https://github.com/hzeller/flaschen-taschen) project.  Since it's being used as a sub-module, you'll want to clone this repo with the `--recursive` option:
 
