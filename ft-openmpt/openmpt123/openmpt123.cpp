@@ -109,9 +109,9 @@ static const char * const license =
 #include "openmpt123_waveout.hpp"
 
 // FT Defaults [FT]
-#define FT_DISPLAY_WIDTH  (9*5)
-#define FT_DISPLAY_HEIGHT (7*5)
-#define FT_Z_LAYER 11  // (0-15) 0=background
+#define FT_DISPLAY_WIDTH  (9*5) // don't change
+#define FT_DISPLAY_HEIGHT (7*5) // don't change
+#define FT_Z_LAYER 9  // (0-15) 0=background
 #define FT_PROGRESS_BAR 1    // 0=bottom, 1=top
 
 //#define FT_FONT_FILE "../ft/client/fonts/5x5.bdf"
@@ -119,6 +119,14 @@ static const char * const license =
 
 
 namespace openmpt123 {
+
+// Command Line Options (eventually) [FT]
+int opt_width = 20;   // set to actual width (20 = half, 40 = full)
+int opt_height = 30; // set to actual height
+int opt_xoff = 20;  // 20 = right-side, 0 = left-side or full size
+int opt_yoff = 5;  // 5 = FT is 6 crates (30) high, 0 = 7 crates (35)
+int opt_layer = FT_Z_LAYER;
+bool opt_trans_bg = true;
 
 struct silent_exit_exception : public std::exception {
 	silent_exit_exception() throw() { }
@@ -1021,8 +1029,8 @@ static void randomizePalette( int instruments, Color palette[] ) {
 // draw colored dots
 void testPalette( UDPFlaschenTaschen & canvas, Color palette[] ) {
 
-	for (int x=0; x < FT_DISPLAY_WIDTH; ++x) {
-		canvas.SetPixel( x, FT_DISPLAY_HEIGHT - 1, palette[x] );
+	for (int x=0; x < opt_width; ++x) {
+		canvas.SetPixel( x, opt_height - 1, palette[x] );
 	}
 }
 
@@ -1062,26 +1070,25 @@ static void ft_draw_notes( std::ostream & log, Tmod & mod, UDPFlaschenTaschen & 
 	int note_num, effect;
 	int px, py;
 	float vol;
-    //Color bg = Color(0, 0, 0);
-    Color bg = Color(1, 1, 1);
+	Color bg = opt_trans_bg ? Color(0, 0, 0) : Color(1, 1, 1);
 
 	// widen note pixels
 	int p_width, p_offset = 0;
-	if (num_channels <= (FT_DISPLAY_WIDTH / 5)) {
+	if (num_channels <= (opt_width / 5)) {
 		p_width = 5;
 	}
 	else {
-		p_width = FT_DISPLAY_WIDTH / num_channels;
+		p_width = opt_width / num_channels;
 	}
 
 	// vertically center notes
-	p_offset = ((FT_DISPLAY_WIDTH - (num_channels * p_width)) >> 1);
+	p_offset = ((opt_width - (num_channels * p_width)) >> 1);
 	p_offset -= (p_offset % p_width);  // aligns on p_width boundry
 	log << "  FT Debug : w:" << p_width << " o:" << p_offset << std::endl;  // DEBUG
 
 	log << "     Notes : ";
 	for (int c=0; c < num_channels; c++) {
-		px = c % FT_DISPLAY_WIDTH;  // prevents overflow
+		px = c % opt_width;  // prevents overflow
 		note = mod.get_pattern_row_channel_command( pattern, row, c, openmpt::module::command_index::command_note );
 		inst = mod.get_pattern_row_channel_command( pattern, row, c, openmpt::module::command_index::command_instrument );
 		effect = (int)mod.get_pattern_row_channel_command( pattern, row, c, openmpt::module::command_index::command_effect );
@@ -1093,7 +1100,7 @@ static void ft_draw_notes( std::ostream & log, Tmod & mod, UDPFlaschenTaschen & 
 		vol = mod.get_current_channel_vu_mono(c);
 		if (vol == 0) {
 			// clear column when volume silent
-			for (int y = FT_PROGRESS_BAR; y < FT_DISPLAY_HEIGHT - (1 - FT_PROGRESS_BAR); ++y) {  // not in last row
+			for (int y = FT_PROGRESS_BAR; y < opt_height - (1 - FT_PROGRESS_BAR); ++y) {  // not in last row
 				for (int i=0; i < p_width; ++i) {
 					canvas.SetPixel( px * p_width + i + p_offset, y, bg );
 				}
@@ -1108,7 +1115,7 @@ static void ft_draw_notes( std::ostream & log, Tmod & mod, UDPFlaschenTaschen & 
 			// draw pixel
 
 			// clear column
-			for (int y = FT_PROGRESS_BAR; y < FT_DISPLAY_HEIGHT - (1 - FT_PROGRESS_BAR); ++y) {  // not in last row
+			for (int y = FT_PROGRESS_BAR; y < opt_height - (1 - FT_PROGRESS_BAR); ++y) {  // not in last row
 				for (int i=0; i < p_width; ++i) {
 					canvas.SetPixel( px * p_width + i + p_offset, y, bg );
 				}
@@ -1140,9 +1147,9 @@ static void ft_draw_notes( std::ostream & log, Tmod & mod, UDPFlaschenTaschen & 
 			if (note_num < 255) {
 			//if ((note_num < 255) && (effect != 0xEC)) {  // TEST 0xEC
 				//py = FT_DISPLAY_HEIGHT - (note_num - 65 + (FT_DISPLAY_HEIGHT >> 1));  // original
-				py = FT_DISPLAY_HEIGHT - (((note_num - 65) >> 1) + (FT_DISPLAY_HEIGHT >> 1));  // div note by 2 (better)
+				py = opt_height - (((note_num - 65) >> 1) + (opt_height >> 1));  // div note by 2 (better)
 
-				if ((py >= FT_PROGRESS_BAR) && (py < FT_DISPLAY_HEIGHT - (1 - FT_PROGRESS_BAR))) {  // not in progress bar
+				if ((py >= FT_PROGRESS_BAR) && (py < opt_height - (1 - FT_PROGRESS_BAR))) {  // not in progress bar
 					for (int i=0; i < p_width; ++i) {
 						canvas.SetPixel( px * p_width + i + p_offset, py, palette[inst] );
 						// draw black above and below
@@ -1161,20 +1168,23 @@ static void ft_draw_notes( std::ostream & log, Tmod & mod, UDPFlaschenTaschen & 
 template < typename Tmod >
 static void ft_draw_progress( Tmod & mod, UDPFlaschenTaschen & canvas, double & duration ) {
 
-	int px = std::floor( (mod.get_position_seconds() / duration) * FT_DISPLAY_WIDTH );
-	int row = (FT_PROGRESS_BAR == 0) ? FT_DISPLAY_HEIGHT - 1 : 0;  // bottom or top
-	canvas.SetPixel( px - 1, row, Color(0x20, 0x20, 0x20) );
-	canvas.SetPixel( px    , row, Color(0xFF, 0xFF, 0xFF) );
+	int px = std::floor( (mod.get_position_seconds() / duration) * opt_width );
+	int row = (FT_PROGRESS_BAR == 0) ? opt_height - 1 : 0;  // bottom or top
+	if (px > 0) {
+		canvas.SetPixel( px - 1, row, Color(0x20, 0x20, 0x20) );
+	}
+	canvas.SetPixel( px, row, Color(0xFF, 0xFF, 0xFF) );
 }
 
 static void ft_draw_title( std::string title, int x_pos, ft::Font & text_font, ft::Font & outline_font, UDPFlaschenTaschen & canvas ) {
 
 	const char *text = title.c_str();
 	Color fg = Color(0x99, 0x99, 0x99);
-	Color bg = Color(1, 1, 1);
-	//int base_row = 4;  // 4 = no rows above
-	int base_row = 5;  // 5 = one row above
+	Color bg = opt_trans_bg ? Color(0, 0, 0) : Color(1, 1, 1);
+	//Color bg = Color(0, 0, 0); // always transparent
+	int base_row = 4;  // 4 = no rows above, 5 = one row above
 
+	// FIXME: text draws off right outside viewport
 	DrawText(&canvas, outline_font, x_pos, base_row, bg, NULL, text, -2);
 	DrawText(&canvas, text_font, x_pos + 1, base_row, fg, &bg, text, 0);
 }
@@ -1226,8 +1236,14 @@ void render_loop( commandlineflags & flags, Tmod & mod, double & duration, texto
 	// Open socket and create our canvas [FT]
 	const int ft_socket = OpenFlaschenTaschenSocket(NULL);  // to set hostname use export FT_DISPLAY
 	UDPFlaschenTaschen ft_canvas(ft_socket, FT_DISPLAY_WIDTH, FT_DISPLAY_HEIGHT);
-	Color bg = Color(1, 1, 1); // black bg
-	ft_canvas.Fill(bg);
+	Color bg = opt_trans_bg ? Color(0, 0, 0) : Color(1, 1, 1);
+	//ft_canvas.Fill(bg); // TODO: limit to geometry
+	// only fill with defined geometry
+	for (int y=0; y < opt_height; ++y) {
+		for (int x=0; x < opt_width; ++x) {
+			ft_canvas.SetPixel(x, y, bg);
+		}
+	}
 
 	// Load font & prepare scrolling title [FT]
 	ft::Font ft_font;
@@ -1244,8 +1260,8 @@ void render_loop( commandlineflags & flags, Tmod & mod, double & duration, texto
 	std::string ft_title = mod.get_metadata("title");
 	const char *ft_text = ft_title.c_str();
 	int ft_text_width = DrawText(&ft_canvas, ft_font, 0, 0, bg, NULL, ft_text, 0);
-	int ft_total_width = ft_text_width + FT_DISPLAY_WIDTH;
-	int ft_scroll_pos = FT_DISPLAY_WIDTH;
+	int ft_total_width = ft_text_width + opt_width;
+	int ft_scroll_pos = opt_width;
 
 	// Setup palette [FT]
 	Color palette[256];
@@ -1434,7 +1450,7 @@ void render_loop( commandlineflags & flags, Tmod & mod, double & duration, texto
 					ft_scroll_pos--;
 				}
 			}
-			ft_canvas.SetOffset(0, 0, FT_Z_LAYER);
+			ft_canvas.SetOffset(opt_xoff, opt_yoff, opt_layer);
 			ft_canvas.Send();
 			// ----------
 
